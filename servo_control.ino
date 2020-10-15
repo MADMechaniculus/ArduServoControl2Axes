@@ -1,3 +1,5 @@
+#include <Wire.h>
+
 #define SERVO_H_MAX   150
 #define SERVO_H_MIN   30
 
@@ -5,6 +7,10 @@
 #define SERVO_V_MIN   40
 
 #define ENABLE 1
+
+#define SENSOR_US    0
+#define SENSOR_IR    1
+#define SENSOR_LS    2
 
 #include <Servo.h>
 
@@ -14,7 +20,13 @@ Servo servo_V;
 int trigger = 8;
 int echo    = 9;
 
-int microsec = 0;
+int sensorType_0 = 7;
+int sensorType_1 = 8;
+
+long duration = 0, mm = 0;
+int sensor   = SENSOR_US;
+
+boolean first_start = true;
 
 void setup() {
   Serial.begin(9600);
@@ -24,9 +36,27 @@ void setup() {
   
   pinMode(trigger,  OUTPUT);
   pinMode(echo,     INPUT);
+  
+  pinMode(sensorType_0, INPUT);
+  pinMode(sensorType_1, INPUT);
 }
 
 void loop(){
+  
+  if (first_start)
+  {
+  //Определение типа датчика
+  if (digitalRead(sensorType_0) == LOW && digitalRead(sensorType_1) == LOW)
+    sensor = SENSOR_US;
+  if (digitalRead(sensorType_0) == LOW && digitalRead(sensorType_1) == HIGH)
+    sensor = SENSOR_IR;
+  if (digitalRead(sensorType_0) == HIGH && digitalRead(sensorType_1) == HIGH)
+    sensor = SENSOR_LS;
+   
+    first_start = false;
+  }
+  
+  //Основное тело рабочего цикла
   if (ENABLE == 1){
     for (int i = SERVO_V_MAX; i > SERVO_V_MIN; i--)
     {
@@ -35,22 +65,20 @@ void loop(){
       {
         servo_H.write(j);
         
-        digitalWrite(trigger, HIGH);
-        delay(7);
+        digitalWrite(trigger, LOW);
+        delayMicroseconds(2); 
+        digitalWrite(trigger, HIGH); 
+        delayMicroseconds(10); 
         digitalWrite(trigger, LOW);
         
-        while(digitalRead(echo) != HIGH);
+        duration = pulseIn(echo, HIGH, 58000);
         
-        while(digitalRead(echo) == HIGH)
-        {
-          delayMicroseconds(1);
-          microsec++;
-        }
+        mm = duration*10 / 58;
         
-        Serial.write(microsec);
-        microsec = 0;
+        Serial.write(mm);
         
-        delay(5);
+        mm = 0;
+        duration = 0;
       }
       servo_H.write(SERVO_H_MIN);
     }
